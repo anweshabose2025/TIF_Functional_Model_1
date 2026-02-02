@@ -9,8 +9,10 @@ import { Assumptions } from '@/types/financial';
 import { useState, useEffect } from 'react';
 
 export default function AssumptionsPage() {
-  const { assumptions, updateAssumptions, recalculate, results} = useFinancial();
+  const { assumptions, updateAssumptions, recalculate, results, saveAssumptions, isLoading } = useFinancial();
   const [localAssumptions, setLocalAssumptions] = useState<Assumptions>(assumptions);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -108,17 +110,41 @@ export default function AssumptionsPage() {
     updateAssumptions(localAssumptions);
     recalculate();
   };
-  //
-//  const handleSave = () => {
-//  updateAssumptions(localAssumptions);
-//  localStorage.setItem("assumptions", JSON.stringify(localAssumptions));
-//};
-//useEffect(() => {
-//  setLocalAssumptions(assumptions);
-//}, [assumptions]);
-//
-//
 
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveMessage(null);
+    try {
+      const success = await saveAssumptions(localAssumptions);
+      if (success) {
+        setSaveMessage('Changes saved successfully');
+        setTimeout(() => setSaveMessage(null), 3000);
+      } else {
+        setSaveMessage('Failed to save changes');
+        setTimeout(() => setSaveMessage(null), 5000);
+      }
+    } catch (error) {
+      setSaveMessage('Error saving changes');
+      setTimeout(() => setSaveMessage(null), 5000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    setLocalAssumptions(assumptions);
+  }, [assumptions]);
+
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4 max-w-7xl">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-gray-600">Loading assumptions...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
@@ -1360,16 +1386,25 @@ export default function AssumptionsPage() {
           </CardContent>
         </Card>
 
-        <div className="flex justify-between items-center gap-4">{/* */}
-          <div className="flex gap-4">
+        <div className="flex justify-between items-center gap-4">
+          <div className="flex gap-4 items-center">
             <Button onClick={handleRecalculate} size="lg" className="bg-blue-600 hover:bg-blue-700">
               Recalculate Model
             </Button>
-            {/*<Button 
-              onClick={handleSave} size="lg" className='bg-green-600 hover:bg-green-700'>
-              Save Changes
-            </Button>*/}
-            </div>
+            <Button
+              onClick={handleSave}
+              size="lg"
+              className="bg-green-600 hover:bg-green-700"
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </Button>
+            {saveMessage && (
+              <div className={`text-sm font-medium ${saveMessage.includes('successfully') ? 'text-green-600' : 'text-red-600'}`}>
+                {saveMessage}
+              </div>
+            )}
+          </div>
 
 
           {results && (

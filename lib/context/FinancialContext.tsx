@@ -1,14 +1,17 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';//
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Assumptions, CalculationResults } from '@/types/financial';
 import { calculateAll } from '@/lib/calculations';
+import { loadAssumptions, saveAssumptions as saveAssumptionsToDb } from '@/lib/supabase/assumptions';
 
 interface FinancialContextType {
   assumptions: Assumptions;
   results: CalculationResults | null;
   updateAssumptions: (newAssumptions: Assumptions) => void;
   recalculate: () => void;
+  saveAssumptions: (newAssumptions: Assumptions) => Promise<boolean>;
+  isLoading: boolean;
 }
 
 const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
@@ -196,24 +199,42 @@ const defaultAssumptions: Assumptions = {
 
 export function FinancialProvider({ children }: { children: ReactNode }) {
   const [assumptions, setAssumptions] = useState<Assumptions>(defaultAssumptions);
-//  const [assumptions, setAssumptions] = useState<Assumptions>(() => {
-//  if (typeof window !== "undefined") {
-//    const saved = localStorage.getItem("assumptions");
-//    if (saved) return JSON.parse(saved);
-//  }
-//  return defaultAssumptions;
-//});
-//useEffect(() => {
-//  localStorage.setItem("assumptions", JSON.stringify(assumptions));
-//}, [assumptions]);
-
-//
-
   const [results, setResults] = useState<CalculationResults | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  useEffect(() => {
+    const loadSavedAssumptions = async () => {
+      setIsLoading(true);
+      try {
+        const savedAssumptions = await loadAssumptions();
+        if (savedAssumptions) {
+          setAssumptions(savedAssumptions);
+        }
+      } catch (error) {
+        console.error('Failed to load assumptions:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSavedAssumptions();
+  }, []);
 
   const updateAssumptions = (newAssumptions: Assumptions) => {
     setAssumptions(newAssumptions);
+  };
+
+  const saveAssumptions = async (newAssumptions: Assumptions): Promise<boolean> => {
+    try {
+      const success = await saveAssumptionsToDb(newAssumptions);
+      if (success) {
+        setAssumptions(newAssumptions);
+      }
+      return success;
+    } catch (error) {
+      console.error('Failed to save assumptions:', error);
+      return false;
+    }
   };
 
   const recalculate = () => {
@@ -226,7 +247,7 @@ export function FinancialProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <FinancialContext.Provider value={{ assumptions, results, updateAssumptions, recalculate}}>
+    <FinancialContext.Provider value={{ assumptions, results, updateAssumptions, recalculate, saveAssumptions, isLoading }}>
       {children}
     </FinancialContext.Provider>
   );
